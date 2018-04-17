@@ -14,7 +14,9 @@ function getTypes() {
                 reject(err)
                 return;
             }
-            csv.parse(data, { columns: true }, (err, objs) => {
+            csv.parse(data, {
+                columns: true
+            }, (err, objs) => {
                 if (err) {
                     reject(err)
                     return;
@@ -49,7 +51,7 @@ function savePlayList(playlist) {
     });
 }
 
-function filter_playlist(channel_name, channel_type){
+function filter_playlist(channel_name, channel_type) {
     if (channel_type == "Украинские") return false;
     if (channel_type == "Молдова") return false;
     if (channel_type == "Белорусские") return false;
@@ -64,7 +66,10 @@ function filter_playlist(channel_name, channel_type){
 }
 
 function patchPlaylits(playlist, types, filter_playlist) {
-    const dict = types.reduce((p, e) => { p[e.channel.toLowerCase()] = e.type; return p }, {})
+    const dict = types.reduce((p, e) => {
+        p[e.channel.toLowerCase()] = e.type;
+        return p
+    }, {})
     const rx = /(#EXTINF:-1),(.*)/i;
     const result = [];
     let skip = false;
@@ -85,16 +90,15 @@ function patchPlaylits(playlist, types, filter_playlist) {
                 } else {
                     skip = true;
                 }
-            } else {                
+            } else {
                 console.log(`Тип канала ${channel_name} не извесен`);
-                if (filter_playlist(channel_name, null)) {                    
+                if (filter_playlist(channel_name, null)) {
                     result.push(line);
                 } else {
                     skip = true;
                 }
             }
-        }
-        else {
+        } else {
             result.push(line)
         }
     }
@@ -108,7 +112,7 @@ function main() {
             const new_playlist = patchPlaylits(playlist_str, types, filter_playlist);
             savePlayList(new_playlist).then(
                 () => console.log("all ok")
-            )                
+            )
         })
     });
 }
