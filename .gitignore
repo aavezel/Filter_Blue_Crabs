@@ -1,0 +1,9 @@
+node_modules/
+.npm
+.eslintcache
+.node_repl_history
+*.tgz
+.yarn-integrity
+.env
+.next
+.m3u
