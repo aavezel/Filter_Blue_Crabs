@@ -6,4 +6,4 @@ node_modules/
 .yarn-integrity
 .env
 .next
-.m3u
+*.m3u
