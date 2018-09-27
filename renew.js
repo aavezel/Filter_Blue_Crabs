@@ -98,7 +98,10 @@ function patchPlaylits(playlist, types, filter_playlist) {
                     skip = true;
                 }
             }
-        } else {
+        } else{
+            if (line.startsWith("http://hls.goodgame.ru")) {
+                result.push("#EXTVLCOPT:http-user-agent=Mozilla/5.0 (X11; Linux x86_64; rv:10.0.7)")
+            }
             result.push(line)
         }
     }
