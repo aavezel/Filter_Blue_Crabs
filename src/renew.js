@@ -3,7 +3,7 @@
 const fetch = require("node-fetch");
 const fs = require("fs");
 const csv = require("csv");
-const config = require("./config");
+const config = require("../config");
 
 main();
 

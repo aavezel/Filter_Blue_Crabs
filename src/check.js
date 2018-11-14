@@ -2,7 +2,7 @@
 
 var fs = require("fs");
 var csv = require("csv");
-var config = require("./config");
+var config = require("../config");
 
 main();
 
