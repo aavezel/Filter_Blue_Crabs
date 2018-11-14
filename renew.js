@@ -1,123 +1,112 @@
-const fetch = require('node-fetch');
-const fs = require('fs');
-const csv = require('csv')
+const fetch = require("node-fetch");
+const fs = require("fs");
+const csv = require("csv");
+const config = require("./config");
 
-const playlistUrl = "http://.../Free.m3u";
-const typesFile = "..../types.csv";
-const playlistSaveFile = "...../Free.m3u";
+main();
 
-
-function getTypes() {
-    return new Promise((resolve, reject) => {
-        fs.readFile(typesFile, "utf8", (err, data) => {
-            if (err) {
-                reject(err)
-                return;
-            }
-            csv.parse(data, {
-                columns: true
-            }, (err, objs) => {
-                if (err) {
-                    reject(err)
-                    return;
-                }
-                resolve(objs);
-            });
-        });
-    })
+async function main() {
+    try {
+        const [types, playlist] = await Promise.all([getTypes(), getPlayList()]);
+        const new_playlist = patchPlaylits(playlist, types);
+        await savePlayList(new_playlist);
+        console.log("all ok");
+    } catch (e) {
+        console.error(e);
+    }
 }
 
-function getPlayList() {
-    return new Promise((resolve, reject) => {
-        fetch(playlistUrl).then(
-            (data) => {
-                data.text().then((text) => {
-                    resolve(text);
-                })
-            }
-        ).catch((err) => reject(err));
+async function readTypesFile(){
+    return new Promise((res, rej) => {
+        fs.readFile(config.types_file, "utf8", (err, data) => {
+            if (err) rej(err);
+            else res(data);
+        });
     });
 }
 
-function savePlayList(playlist) {
+async function parseCSV(data, option){
+    return new Promise((res, rej) => {
+        csv.parse(data, option, (err, data) => {
+            if (err) rej(err);
+            else res(data);
+        });
+    });
+}
+
+async function savePlayList(playlist) {
     return new Promise((resolve, reject) => {
-        fs.writeFile(playlistSaveFile, playlist, "utf-8", (err) => {
+        fs.writeFile(config.save_file, playlist, "utf-8", (err) => {
             if (err) {
                 reject(err);
             } else {
                 resolve();
             }
-        })
+        });
     });
 }
 
-function filter_playlist(channel_name, channel_type) {
-    if (channel_type == "Украинские") return false;
-    if (channel_type == "Молдова") return false;
-    if (channel_type == "Белорусские") return false;
-    if (channel_type == "Казахстан") return false;
-    if (channel_type == "Кыргызстан") return false;
-    if (channel_type == "Иностранные") return false;
-    if (channel_type == "Музыка") return false;
-    if (channel_type == "Мода") return false;
-    if (channel_type == "Магазин") return false;
-    if (channel_type == "Для взрослых") return false;
-    return true;
+async function getTypes() {
+    const data = await readTypesFile();    
+    const table = await parseCSV(data, {columns: true});
+    return table;
 }
 
-function patchPlaylits(playlist, types, filter_playlist) {
-    const dict = types.reduce((p, e) => {
+async function getPlayList() {
+    const data = await fetch(config.original_url);
+    const text = await data.text();
+    return text;
+}
+
+function filter_playlist(channel_name, channel_type) {
+    return (config.skipChannel.indexOf(channel_type) == -1) && (config.skipTypes.indexOf(channel_type) == -1);
+}
+
+function patchPlaylits(playlist, types) {
+    const dictLowerCaseChannels = types.reduce((p, e) => {
         p[e.channel.toLowerCase()] = e.type;
-        return p
-    }, {})
+        return p;
+    }, {});
     const rx = /(#EXTINF:-1),(.*)/i;
     const result = [];
-    let skip = false;
-    for (let line of playlist.split("\n")) {
-        if (skip) {
-            skip = false;
+    let skipNextLine = false;
+    for (const line of playlist.split("\n")) {
+        if (skipNextLine) {
+            skipNextLine = false;
             continue;
         }
-        const match = rx.exec(line)
+        const match = rx.exec(line);
         if (match && match.length == 3) {
             const channel_name = match[2];
-            const channel_name_l = channel_name.toLowerCase();
-            if (channel_name_l in dict) {
-                const channel_type = dict[channel_name_l];
+            const channel_name_lowerCase = channel_name.toLowerCase();
+            if (channel_name_lowerCase in dictLowerCaseChannels) {
+                const channel_type = dictLowerCaseChannels[channel_name_lowerCase];
                 if (filter_playlist(channel_name, channel_type)) {
-                    let s = match[1] + ` group-title="${channel_type}",` + match[2]
+                    let s = match[1] + ` group-title="${channel_type}",` + match[2];
                     result.push(s);
                 } else {
-                    skip = true;
+                    skipNextLine = true;
                 }
             } else {
-                console.log(`Тип канала ${channel_name} не извесен`);
+                console.warn(`Тип канала ${channel_name} не извесен`);
+
                 if (filter_playlist(channel_name, null)) {
                     result.push(line);
                 } else {
-                    skip = true;
+                    skipNextLine = true;
                 }
             }
-        } else{
-            if (line.startsWith("http://hls.goodgame.ru")) {
-                result.push("#EXTVLCOPT:http-user-agent=Mozilla/5.0 (X11; Linux x86_64; rv:10.0.7)")
-            }
-            result.push(line)
+        } else {
+            fixGoodgame(line, result);
+            result.push(line);
         }
     }
     return result.join("\n");
 
 }
 
-function main() {
-    getTypes().then(types => {
-        getPlayList().then(playlist_str => {
-            const new_playlist = patchPlaylits(playlist_str, types, filter_playlist);
-            savePlayList(new_playlist).then(
-                () => console.log("all ok")
-            )
-        })
-    });
+function fixGoodgame(line, result) {
+    if (line.startsWith("http://hls.goodgame.ru")) {
+        result.push("#EXTVLCOPT:http-user-agent=Mozilla/5.0 (X11; Linux x86_64; rv:10.0.7)");
+    }
 }
-
-main();
