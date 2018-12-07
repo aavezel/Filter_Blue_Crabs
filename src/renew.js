@@ -49,8 +49,10 @@ async function savePlayList(playlist) {
 }
 
 async function getTypes() {
-    const data = await readTypesFile();    
-    const table = await parseCSV(data, {columns: true});
+    const data = await readTypesFile();
+    const table = await parseCSV(data, {
+        columns: true
+    });
     return table;
 }
 
@@ -72,6 +74,7 @@ function patchPlaylits(playlist, types) {
     const rx = /(#EXTINF:-1),(.*)/i;
     const result = [];
     let skipNextLine = false;
+    const statistics = {};
     for (const line of playlist.split("\n")) {
         if (skipNextLine) {
             skipNextLine = false;
@@ -85,6 +88,7 @@ function patchPlaylits(playlist, types) {
                 const channel_type = dictLowerCaseChannels[channel_name_lowerCase];
                 if (filter_playlist(channel_name, channel_type)) {
                     let s = match[1] + ` group-title="${channel_type}",` + match[2];
+                    statistics[channel_type] = statistics[channel_type] + 1 || 1;
                     result.push(s);
                 } else {
                     skipNextLine = true;
@@ -103,8 +107,17 @@ function patchPlaylits(playlist, types) {
             result.push(line);
         }
     }
+    showStatistic(statistics);
     return result.join("\n");
+}
 
+function showStatistic(statistics) {
+    const all = Object.values(statistics).reduce((s, v) => s + v, 0);
+    console.log(`Всего: ${all} `);
+    Object.keys(statistics)
+        .sort((a, b) => statistics[b] - statistics[a])
+        .forEach(channel_type => console.log(`${channel_type}: ${statistics[channel_type]}`));
+    console.log("");
 }
 
 function fixGoodgame(line, result) {
